@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0284C7">
+  <meta name="description" content="LEARNING ACTIVITY — kehadiran guru & karyawan, cover lesson, jadwal piket, dan rekap.">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2216%22 fill=%22%23006194%22/%3E%3Cpath d=%22M32 14 8 26l24 12 20-10v14h4V26z%22 fill=%22%23fff%22/%3E%3Cpath d=%22M18 34v8c0 4 6 8 14 8s14-4 14-8v-8l-14 7z%22 fill=%22%23fff%22/%3E%3C/svg%3E">
+  <title>LEARNING ACTIVITY</title>
+
+  <!-- Terapkan tema sebelum render pertama (tanpa kedipan) -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('la_theme');
+        if (!t) t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) { /* storage diblokir: pakai tema terang */ }
+    })();
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="preconnect" href="https://script.google.com">
+  <link rel="preconnect" href="https://script.googleusercontent.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..24,400..500,0..1,0&display=block" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Layar pembuka singkat (data sudah ikut di HTML, jadi hanya sekejap) -->
+  <div id="bootSplash" aria-hidden="true">
+    <div class="text-center">
+      <div class="logo-mark mx-auto"><span class="msi lg">school</span></div>
+      <div class="boot-bar"></div>
+    </div>
+  </div>
+
+  <!-- ═════════════ HALAMAN MASUK (Sign in with Google) ═════════════ -->
+  <div id="loginRoot" class="login" hidden></div>
+
+  <!-- ═════════════ HALAMAN AKSES DITOLAK ═════════════ -->
+  <div id="deniedRoot" class="denied" hidden></div>
+
+  <!-- ═════════════ APLIKASI ═════════════ -->
+  <div id="appRoot" class="app" hidden>
+
+    <!-- Sidebar (desktop) / drawer (ponsel) -->
+    <aside id="sidebar" class="sidebar" aria-label="Navigasi utama">
+      <a class="brand" href="javascript:void(0)" onclick="App.go('beranda')" aria-label="Beranda">
+        <span class="logo-mark" id="brandLogo"><span class="msi lg">school</span></span>
+        <span class="brand-text">
+          <span class="brand-name">LEARNING</span><br>
+          <span class="brand-sub">Activity</span>
+        </span>
+      </a>
+      <nav id="navList"></nav>
+      <div class="sidebar-foot">
+        <button class="profile-tray" type="button" onclick="App.openProfile()" aria-label="Profil dan pengaturan akun">
+          <span class="avatar" id="trayAvatar" style="background:var(--primary-strong);color:#fff"><span class="msi">person</span></span>
+          <span class="who"><b id="trayName">—</b><span id="trayRole">—</span></span>
+          <span class="msi muted desk-only">tune</span>
+        </button>
+      </div>
+    </aside>
+    <div id="scrim" class="scrim" onclick="App.closeDrawer()"></div>
+
+    <main class="main" id="main">
+      <div id="simBanner" class="sim-banner" hidden></div>
+      <div class="offline-bar"><span class="msi sm">cloud_off</span> Koneksi terputus — perubahan akan dicoba kirim ulang saat online.</div>
+
+      <header class="topbar" role="banner">
+        <button class="icon-btn mobile-only" type="button" onclick="App.openDrawer()" aria-label="Buka menu"><span class="msi">menu</span></button>
+        <div id="unitCtl" class="desk-only"></div>
+        <div id="dateCtl"></div>
+        <div class="spacer"></div>
+        <span id="syncState" class="small-xs muted desk-only" aria-live="polite"></span>
+        <div class="rel" id="notifWrap">
+          <button class="icon-btn" type="button" id="notifBtn" onclick="App.toggleNotif(event)" aria-label="Log notifikasi email" aria-expanded="false">
+            <span class="msi">mail</span><span class="dot" id="notifDot" hidden></span>
+          </button>
+          <div class="dropdown-la" id="notifDrop" role="dialog" aria-label="Log notifikasi"></div>
+        </div>
+        <button class="icon-btn" type="button" onclick="App.toggleTheme()" aria-label="Ganti mode terang/gelap"><span class="msi" id="themeIco">dark_mode</span></button>
+        <button class="user-chip desk-only" type="button" onclick="App.openProfile()" aria-label="Profil">
+          <span class="txt"><b id="topName">—</b><span id="topRole">—</span></span>
+          <span class="avatar" style="background:var(--primary-strong);color:#fff"><span class="msi">person</span></span>
+        </button>
+      </header>
+
+      <div class="page">
+        <!-- Unit pills untuk ponsel -->
+        <div id="unitCtlMobile" class="mb-3 mobile-only" style="display:none"></div>
+
+        <section id="sec-beranda" class="section-la" aria-label="Beranda"><div id="view-beranda"></div></section>
+        <section id="sec-kehadiran" class="section-la" aria-label="Kehadiran"><div id="view-kehadiran"></div></section>
+        <section id="sec-input" class="section-la" aria-label="Input Ketidakhadiran"><div id="view-input"></div></section>
+        <section id="sec-cover" class="section-la" aria-label="Cover Lesson"><div id="view-cover"></div></section>
+        <section id="sec-tugas" class="section-la" aria-label="Tugas Piket Saya"><div id="view-tugas"></div></section>
+        <section id="sec-jadwal" class="section-la" aria-label="Jadwal Term"><div id="view-jadwal"></div></section>
+        <section id="sec-rekap" class="section-la" aria-label="Rekap Guru"><div id="view-rekap"></div></section>
+        <section id="sec-rekapDetail" class="section-la" aria-label="Detail Rekap"><div id="view-rekapDetail"></div></section>
+        <section id="sec-admin" class="section-la" aria-label="Pengguna dan Peran"><div id="view-admin"></div></section>
+      </div>
+    </main>
+
+    <!-- Navigasi bawah (ponsel) -->
+    <nav id="bottomNav" class="bottom-nav" aria-label="Navigasi ponsel"></nav>
+  </div>
+
+  <!-- Modal generik (form, detail, konfirmasi) -->
+  <div class="modal fade" id="modalMain" tabindex="-1" aria-hidden="true" aria-labelledby="modalMainTitle">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" id="modalMainDialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div class="d-flex align-items-center gap-3" style="min-width:0">
+            <span class="stat-ico ico-primary" id="modalMainIcon"><span class="msi">edit_note</span></span>
+            <div style="min-width:0"><h2 class="modal-title" id="modalMainTitle">—</h2><div class="small-xs muted" id="modalMainSub"></div></div>
+          </div>
+          <button type="button" class="btn-close-la" data-bs-dismiss="modal" aria-label="Tutup"><span class="msi">close</span></button>
+        </div>
+        <div class="modal-body" id="modalMainBody"></div>
+        <div class="modal-footer" id="modalMainFoot"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal pratinjau berkas (tidak membuka tab baru) -->
+  <div class="modal fade" id="modalPreview" tabindex="-1" aria-hidden="true" aria-labelledby="previewTitle">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div class="d-flex align-items-center gap-3" style="min-width:0">
+            <span class="stat-ico ico-sakit"><span class="msi">description</span></span>
+            <h2 class="modal-title text-truncate" id="previewTitle">Pratinjau</h2>
+          </div>
+          <button type="button" class="btn-close-la" data-bs-dismiss="modal" aria-label="Tutup"><span class="msi">close</span></button>
+        </div>
+        <div class="modal-body"><div class="preview-stage" id="previewStage"></div></div>
+        <div class="modal-footer">
+          <button type="button" class="btn-la btn-ghost" data-bs-dismiss="modal"><span class="msi">close</span> Tutup</button>
+          <button type="button" class="btn-la btn-primary-la" id="previewDownload"><span class="msi">download</span> Unduh</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
+
+  <!-- Pustaka: Bootstrap (modal), Chart.js (grafik, async), Google Identity Services (login) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script async src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" onload="window.App && App.onChartReady()"></script>
+  <script async defer src="https://accounts.google.com/gsi/client"></script>
+
+  <!-- Aplikasi (urutan penting) -->
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
