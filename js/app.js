@@ -954,9 +954,35 @@ function renderBerkasBox() {
   if (dz) { dz.ondragover = (e) => { e.preventDefault(); dz.classList.add('drag'); }; dz.ondragleave = () => dz.classList.remove('drag'); dz.ondrop = (e) => { e.preventDefault(); dz.classList.remove('drag'); fFile(e.dataTransfer.files[0]); }; }
 }
 
-function piketOptions(tgl, unit, exclude) {
+/** Jam mengajar (dari Jadwal Mengajar) milik guru yang beririsan dengan rentang waktu pada tanggal tertentu. */
+function mengajarBentrok(guruId, tgl, mulai, selesai) {
+  const t = termOf(tgl); if (!guruId || !t) return [];
+  const mnt = (x) => { const m = /^(\d{1,2}):(\d{2})/.exec(String(x || '')); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+  const a = mnt(mulai), b = mnt(selesai); if (a === null || b === null) return [];
+  const hr = hariNo(tgl), out = [];
+  (S.data.jmengajar || []).forEach((j) => {
+    if (j.pengguna_id !== guruId || j.term_id !== t.term_id || Number(j.hari) !== hr) return;
+    const jam = (S.idx.jamByUnit[j.unit_id] || []).find((x) => Number(x.urutan) === Number(j.urutan)); if (!jam) return;
+    const c = mnt(jam.mulai), d = mnt(jam.selesai); if (c === null || d === null) return;
+    if (c < b && d > a) out.push({ urutan: Number(j.urutan), kelas: kelasName(j.kelas_id), mapel: j.mapel || '' });
+  });
+  return out.sort((x, y) => x.urutan - y.urutan);
+}
+/** [1,2,3,5] -> "Jam 1-3, 5" */
+function jamRingkas(list) {
+  const u = [...new Set(list.map(Number))].sort((x, y) => x - y), parts = [];
+  for (let i = 0; i < u.length;) { let j = i; while (j + 1 < u.length && u[j + 1] === u[j] + 1) j++; parts.push(i === j ? String(u[i]) : u[i] + '-' + u[j]); i = j + 1; }
+  return 'Jam ' + parts.join(', ');
+}
+const bentrokDetail = (bt) => bt.map((b) => `Jam ${b.urutan} (${b.kelas}${b.mapel ? ' · ' + b.mapel : ''})`).join(', ');
+
+function piketOptions(tgl, unit, exclude, mulai, selesai) {
   return S.data.piket.filter((p) => p.tanggal === tgl && p.unit_id === unit && p.pengguna_id !== exclude)
-    .map((p) => { const load = S.data.cover.filter((k) => k.guru_piket_id === p.pengguna_id && k.tanggal === tgl).length; return { v: p.pengguna_id, l: `${nama(p.pengguna_id)} — Piket ${p.shift === 'SIANG' ? 'Siang' : 'Pagi'} ${unit}${load ? ` (${load} tugas)` : ''}` }; });
+    .map((p) => {
+      const load = S.data.cover.filter((k) => k.guru_piket_id === p.pengguna_id && k.tanggal === tgl).length;
+      const bt = mengajarBentrok(p.pengguna_id, tgl, mulai, selesai);
+      return { v: p.pengguna_id, bt, l: `${nama(p.pengguna_id)} — Piket ${p.shift === 'SIANG' ? 'Siang' : 'Pagi'} ${unit}${load ? ` (${load} tugas)` : ''}${bt.length ? ` \u26A0 Mengajar ${jamRingkas(bt.map((b) => b.urutan))}` : ''}` };
+    });
 }
 
 function renderSlots() {
@@ -968,7 +994,10 @@ function renderSlots() {
   const jams = S.idx.jamByUnit[unit] || [];
   const dates = []; for (let d = F.tanggal_mulai; d <= F.tanggal_berakhir && dates.length < 62; d = addDays(d, 1)) if (hariKerja(d, unit)) dates.push(d);
   box.innerHTML = F.kelas.map((k, i) => {
-    const po = piketOptions(k.tanggal, unit, F.pengguna_id);
+    const ji = jamInfo(k);
+    const po = piketOptions(k.tanggal, unit, F.pengguna_id, ji.mulai, ji.selesai);
+    const sel = po.find((o) => o.v === k.guru_piket_id);
+    const warnPk = sel && sel.bt.length ? `<div class="help" style="color:var(--sick-fg);font-weight:600">${ico('warning', 'sm')} ${esc(nama(sel.v))} sedang mengajar ${esc(bentrokDetail(sel.bt))} pada jam ini. Pastikan sudah ada kesepakatan.</div>` : '';
     return `<div class="slot-box" data-i="${i}">
       <div class="d-flex justify-content-between align-items-center mb-3"><div><span class="slot-tag">Slot #${i + 1}</span> <span class="small-xs muted ms-1">Penugasan periode</span></div><button type="button" class="icon-btn" onclick="App.fDelSlot(${i})" aria-label="Hapus slot ${i + 1}">${ico('delete')}</button></div>
       <div class="row g-2">
@@ -977,7 +1006,7 @@ function renderSlots() {
         <div class="col-md-4"><label class="form-label-la">Mata Pelajaran</label><input class="input-la" value="${esc(k.mata_pelajaran)}" oninput="App.fSlot(${i},'mata_pelajaran',this.value,true)" placeholder="${esc(peg.bidang_studi || 'Mata pelajaran')}"></div>
         <div class="col-6 col-md-4"><label class="form-label-la">Jam Ke- (mulai) <span class="req">*</span></label><select class="select-la" onchange="App.fSlot(${i},'jam_awal_id',this.value)" required><option value="">—</option>${jams.map((j) => `<option value="${j.jam_id}" ${j.jam_id === k.jam_awal_id ? 'selected' : ''}>Jam ${j.urutan} (${j.mulai})</option>`).join('')}</select><div class="field-err">Pilih jam.</div></div>
         <div class="col-6 col-md-4"><label class="form-label-la">s/d Jam Ke-</label><select class="select-la" onchange="App.fSlot(${i},'jam_akhir_id',this.value)" ${k.jam_awal_id ? '' : 'disabled'}>${k.jam_awal_id ? '' : '<option value="">—</option>'}${jams.filter((j) => !k.jam_awal_id || Number(j.urutan) >= Number((S.idx.jam[k.jam_awal_id] || {}).urutan)).map((j) => `<option value="${j.jam_id}" ${j.jam_id === (k.jam_akhir_id || k.jam_awal_id) ? 'selected' : ''}>Jam ${j.urutan} (s/d ${j.selesai})</option>`).join('')}</select></div>
-        ${guru ? '' : `<div class="col-md-4"><label class="form-label-la">Guru Piket Pengganti</label><select class="select-la" onchange="App.fSlot(${i},'guru_piket_id',this.value)" ${S.perm.kelola_cover ? '' : 'disabled'}><option value="">${po.length ? '— Pilih guru piket —' : 'Tidak ada guru piket terjadwal'}</option>${po.map((o) => `<option value="${o.v}" ${o.v === k.guru_piket_id ? 'selected' : ''}>${esc(o.l)}</option>`).join('')}</select><div class="help">${ico('verified_user', 'sm')} Daftar guru piket ditetapkan Admin</div></div>`}
+        ${guru ? '' : `<div class="col-md-4"><label class="form-label-la">Guru Piket Pengganti</label><select class="select-la" onchange="App.fSlot(${i},'guru_piket_id',this.value)" ${S.perm.kelola_cover ? '' : 'disabled'}><option value="">${po.length ? '— Pilih guru piket —' : 'Tidak ada guru piket terjadwal'}</option>${po.map((o) => `<option value="${o.v}" ${o.v === k.guru_piket_id ? 'selected' : ''}>${esc(o.l)}</option>`).join('')}</select>${warnPk || `<div class="help">${ico('verified_user', 'sm')} Daftar guru piket ditetapkan Admin</div>`}</div>`}
         <div class="col-12"><label class="form-label-la">Instruksi Tugas Pengganti (tugas mandiri untuk siswa)</label><textarea class="textarea-la" style="min-height:72px" oninput="App.fSlot(${i},'instruksi',this.value,true)" placeholder="Contoh: Kerjakan Latihan Mandiri Bab 4 halaman 112 nomor 1–10, kumpulkan di meja guru.">${esc(k.instruksi)}</textarea></div>
       </div></div>`;
   }).join('');
@@ -1028,7 +1057,7 @@ function fSlot(i, k, v, silent) {
   if (k === 'jam_awal_id') { const a = Number((S.idx.jam[v] || {}).urutan), b = Number((S.idx.jam[s.jam_akhir_id] || {}).urutan); if (!s.jam_akhir_id || b < a) s.jam_akhir_id = v; }
   if (k === 'tanggal') { if (s.guru_piket_id && !piketOptions(v, pegById(S.form.pengguna_id).unit_id, S.form.pengguna_id).some((o) => o.v === s.guru_piket_id)) s.guru_piket_id = ''; }
   saveDraft();
-  if (!silent && ['jam_awal_id', 'tanggal'].includes(k)) renderSlots();
+  if (!silent && ['jam_awal_id', 'jam_akhir_id', 'tanggal', 'guru_piket_id'].includes(k)) renderSlots();
   renderSummary();
 }
 function fFile(file) {
@@ -1159,13 +1188,13 @@ function slotCard(k, canEdit) {
 
 function tugaskan(coverId) {
   const k = S.data.cover.find((x) => x.cover_id === coverId); if (!k) return;
-  const opts = piketOptions(k.tanggal, k.unit_id, k.guru_utama_id);
   const j = jamInfo(k);
+  const opts = piketOptions(k.tanggal, k.unit_id, k.guru_utama_id, j.mulai, j.selesai);
   if (!opts.length) { toast('warn', 'Tidak ada guru piket', `Belum ada guru piket ${k.unit_id} pada ${fmtMid(k.tanggal)}. Minta Admin menambahkan di Jadwal Piket.`); return; }
   formModal({
     title: k.guru_piket_id ? 'Ubah Guru Pengganti' : 'Tugaskan Guru Pengganti', sub: `${kelasName(k.kelas_id)} · ${j.label} (${j.mulai}–${j.selesai}) · ${fmtMid(k.tanggal)}`, icon: 'person_add', iconCls: 'ico-cover', size: 'md', ok: 'Tugaskan', okIcon: 'swap_horiz',
     fields: [
-      { k: 'guru', l: 'Guru Piket (dari Jadwal Piket)', type: 'select', req: true, opts, help: 'Hanya guru piket yang dijadwalkan Admin pada tanggal & unit ini.' },
+      { k: 'guru', l: 'Guru Piket (dari Jadwal Piket)', type: 'select', req: true, opts, help: 'Hanya guru piket yang dijadwalkan Admin pada tanggal & unit ini. Tanda \u26A0 berarti guru tersebut sedang mengajar pada jam ini (hanya peringatan, tetap bisa dipilih).' },
       { k: 'instruksi', l: 'Instruksi untuk guru piket & siswa', type: 'textarea', ph: 'Tugas mandiri untuk siswa…' }
     ],
     values: { guru: k.guru_piket_id, instruksi: k.instruksi },
@@ -1175,6 +1204,8 @@ function tugaskan(coverId) {
       Object.assign(k, { guru_piket_id: v.guru, instruksi: v.instruksi, status: 'DITUGASKAN', _pending: true });
       reindex(); refreshView();
       toast('ok', 'Guru pengganti ditugaskan', `${nama(v.guru)} → ${kelasName(k.kelas_id)}${S.app.notifAktif ? ' · email dikirim' : ''}`);
+      const bt = mengajarBentrok(v.guru, k.tanggal, j.mulai, j.selesai);
+      if (bt.length) toast('warn', 'Perhatian: guru piket sedang mengajar', `${nama(v.guru)} mengajar ${bentrokDetail(bt)} pada jam ini.`);
       run('tugaskanPiket', coverId, v.guru, v.instruksi).then((r) => { Object.assign(k, r.cover); delete k._pending; reindex(); refreshView(); })
         .catch((err) => { Object.keys(k).forEach((x) => delete k[x]); Object.assign(k, before); reindex(); refreshView(); toast('err', 'Penugasan dibatalkan', err.message); });
     }
@@ -2474,13 +2505,22 @@ function addPiket(tgl) {
     body: `<form id="pkForm" novalidate><div class="row g-3">
       <div class="col-sm-6"><label class="form-label-la" for="pkUnit">Unit <span class="req">*</span></label><select class="select-la" id="pkUnit">${unitOpts.map((o) => `<option value="${o.v}" ${o.v === defUnit ? 'selected' : ''}>${esc(o.l)}</option>`).join('')}</select></div>
       <div class="col-sm-6"><label class="form-label-la" for="pkShift">Shift <span class="req">*</span></label><select class="select-la" id="pkShift"><option value="PAGI">Shift Pagi</option><option value="SIANG">Shift Siang</option></select></div>
-      <div class="col-12"><label class="form-label-la" for="pkGuru">Guru <span class="req">*</span></label><select class="select-la" id="pkGuru" required></select><div class="field-err">Pilih guru.</div></div>
+      <div class="col-12"><label class="form-label-la" for="pkGuru">Guru <span class="req">*</span></label><select class="select-la" id="pkGuru" required></select><div class="field-err">Pilih guru.</div><div class="help" id="pkInfo"></div></div>
       <div class="col-12"><label class="form-label-la">Hari bertugas <span class="req">*</span></label><div class="d-flex flex-wrap gap-2">${days.map((d) => `<label class="check-la panel-tint py-2 px-3"><input type="checkbox" class="pk-day" value="${d}" ${(tgl ? d === tgl : true) ? 'checked' : ''}><span>${HARI_S[dow(d)]}, ${esc(fmtShort(d))}</span></label>`).join('')}</div></div>
     </div></form>`,
     foot: `<button class="btn-la btn-ghost" data-bs-dismiss="modal">Batal</button><button class="btn-la btn-primary-la" type="submit" form="pkForm">${ico('check')} Simpan Penugasan</button>`,
     onShow: () => {
       const fill = () => { const g = guruOpts($('#pkUnit').value); $('#pkGuru').innerHTML = `<option value="">— Pilih guru —</option>${g.map((u) => `<option value="${u.id_pengguna}">${esc(u.nama)} — ${esc(u.bidang_studi || '')}</option>`).join('')}`; };
-      fill(); $('#pkUnit').onchange = fill;
+      const info = () => {
+        const box = $('#pkInfo'), g = $('#pkGuru').value; if (!box) return;
+        const lines = g ? $$('.pk-day').filter((c) => c.checked).map((c) => c.value).map((d) => {
+          const t = termOf(d), us = t ? (S.data.jmengajar || []).filter((j) => j.pengguna_id === g && j.term_id === t.term_id && Number(j.hari) === hariNo(d)).map((j) => j.urutan) : [];
+          return us.length ? `${HARI_S[dow(d)]}: ${jamRingkas(us)}` : '';
+        }).filter(Boolean) : [];
+        box.innerHTML = lines.length ? `<span style="color:var(--sick-fg);font-weight:600">${ico('warning', 'sm')} Guru ini mengajar &mdash; ${esc(lines.join(' \u00B7 '))}. Pastikan jam piket tidak bentrok.</span>` : '';
+      };
+      fill(); $('#pkUnit').onchange = () => { fill(); info(); };
+      $('#pkGuru').onchange = info; $$('.pk-day').forEach((c) => { c.onchange = info; });
       $('#pkForm').onsubmit = (e) => {
         e.preventDefault();
         const guru = $('#pkGuru').value, unit = $('#pkUnit').value, shift = $('#pkShift').value;
