@@ -2562,6 +2562,7 @@ function openProfile() {
       <div class="kv"><span>Unit</span><span>${esc(S.me.unit_id || 'Semua unit')}</span></div>
       <div class="kv"><span>Cakupan data</span><span>${S.cakupan === 'SEMUA' ? 'Semua unit' : S.cakupan === 'UNIT' ? 'Unit sendiri' : 'Data pribadi'}</span></div>
       <label class="check-la panel-tint mt-3"><span class="switch-la"><input type="checkbox" ${dark ? 'checked' : ''} onchange="App.toggleTheme()"><span></span></span><span><b class="text-strong">Mode Gelap</b><br><small class="muted">Tersimpan di perangkat ini</small></span></label>
+      ${window.LA_PWA && !LA_PWA.standalone() ? `<button class="btn-la btn-soft justify-content-start w-100 mt-3" onclick="App.closeModal();LA_PWA.install()">${ico('install_mobile')} Pasang Aplikasi di HP</button>` : ''}
       ${others.length ? `<h3 class="mt-4 mb-2">Menu Lainnya</h3><div class="d-grid gap-2">${others.map((k) => `<button class="btn-la btn-soft justify-content-start" onclick="App.closeModal();App.go('${k}')">${ico(PAGES[k].i)} ${esc(PAGES[k].t)}</button>`).join('')}</div>` : ''}
       ${S.perm.kelola_pengguna && S.admin ? `<button class="btn-la btn-soft justify-content-start w-100 mt-2" onclick="App.closeModal();App.go('admin')">${ico('manage_accounts')} Pengguna &amp; Peran</button>` : ''}
       <div class="small-xs muted mt-4">LEARNING ACTIVITY v${esc(S.app.version)} · ${esc(S.app.sekolah)}<br>Masuk dengan akun Google sekolah · sesi berlaku 12 jam.</div>`,
